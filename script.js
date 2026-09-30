@@ -31,8 +31,8 @@ const orangePercent =
     document.getElementById("orangePercent");
 const greenPercent =
     document.getElementById("greenPercent");
-const violetPercent =
-    document.getElementById("violetPercent");
+const purplePercent =
+    document.getElementById("purplePercent");
 
 
 const blackGrams =
@@ -53,8 +53,8 @@ const orangeGrams =
 const greenGrams =
     document.getElementById("greenGrams");
 
-const violetGrams =
-    document.getElementById("violetGrams");
+const purpleGrams =
+    document.getElementById("purpleGrams");
 
 
 let hue = 30;
@@ -472,7 +472,7 @@ function updateCalculator(r, g, b) {
         { name: "yellow",  r: 255, g: 255, b: 0 },
         { name: "orange",  r: 255, g: 128, b: 0 },
         { name: "green",   r: 0,   g: 255, b: 0 },
-        { name: "violet",  r: 128, g: 0,   b: 255 }
+        { name: "purple",  r: 128, g: 0,   b: 128 }
 
     ];
 
@@ -702,7 +702,7 @@ function updateCalculator(r, g, b) {
         yellowPercent,
         orangePercent,
         greenPercent,
-        violetPercent
+        purplePercent
 
     ];
 
@@ -715,7 +715,7 @@ function updateCalculator(r, g, b) {
         yellowGrams,
         orangeGrams,
         greenGrams,
-        violetGrams
+        purpleGrams
 
     ];
 
