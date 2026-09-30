@@ -1,0 +1,288 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Color Calculator</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: system-ui, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .calculator {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            min-height: 52px;
+            font-size: 18px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+        }
+
+        input[type="color"] {
+            padding: 4px;
+            height: 70px;
+        }
+
+        .color-preview {
+            width: 100%;
+            height: 100px;
+            border-radius: 12px;
+            margin-top: 15px;
+            border: 1px solid #ccc;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            padding: 12px 8px;
+            text-align: right;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        .result {
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="calculator">
+
+    <h1>Color Calculator</h1>
+
+    <div class="card">
+
+        <label for="colorPicker">
+            Pick color
+        </label>
+
+        <input
+            type="color"
+            id="colorPicker"
+            value="#6b6258"
+        >
+
+        <div
+            id="colorPreview"
+            class="color-preview"
+        ></div>
+
+    </div>
+
+
+    <div class="card">
+
+        <label for="waxMass">
+            Wax mass (g)
+        </label>
+
+        <input
+            type="number"
+            id="waxMass"
+            value="30"
+            min="0"
+            step="0.1"
+            inputmode="decimal"
+        >
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>CMYK</h2>
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Color</th>
+                    <th>%</th>
+                    <th>grams</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                <tr>
+                    <td>Cyan</td>
+                    <td id="cyanPercent">0%</td>
+                    <td id="cyanGrams">0 g</td>
+                </tr>
+
+                <tr>
+                    <td>Magenta</td>
+                    <td id="magentaPercent">0%</td>
+                    <td id="magentaGrams">0 g</td>
+                </tr>
+
+                <tr>
+                    <td>Yellow</td>
+                    <td id="yellowPercent">0%</td>
+                    <td id="yellowGrams">0 g</td>
+                </tr>
+
+                <tr>
+                    <td>Black</td>
+                    <td id="blackPercent">0%</td>
+                    <td id="blackGrams">0 g</td>
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const colorPicker = document.getElementById("colorPicker");
+const waxMass = document.getElementById("waxMass");
+
+const colorPreview = document.getElementById("colorPreview");
+
+const cyanPercent = document.getElementById("cyanPercent");
+const magentaPercent = document.getElementById("magentaPercent");
+const yellowPercent = document.getElementById("yellowPercent");
+const blackPercent = document.getElementById("blackPercent");
+
+const cyanGrams = document.getElementById("cyanGrams");
+const magentaGrams = document.getElementById("magentaGrams");
+const yellowGrams = document.getElementById("yellowGrams");
+const blackGrams = document.getElementById("blackGrams");
+
+
+function rgbToCmyk(r, g, b) {
+
+    r = r / 255;
+    g = g / 255;
+    b = b / 255;
+
+    const k = 1 - Math.max(r, g, b);
+
+    if (k === 1) {
+        return {
+            c: 0,
+            m: 0,
+            y: 0,
+            k: 1
+        };
+    }
+
+    const c = (1 - r - k) / (1 - k);
+    const m = (1 - g - k) / (1 - k);
+    const y = (1 - b - k) / (1 - k);
+
+    return {
+        c,
+        m,
+        y,
+        k
+    };
+}
+
+
+function updateCalculator() {
+
+    const hex = colorPicker.value;
+
+    colorPreview.style.backgroundColor = hex;
+
+    const r = parseInt(hex.substring(1, 3), 16);
+    const g = parseInt(hex.substring(3, 5), 16);
+    const b = parseInt(hex.substring(5, 7), 16);
+
+    const cmyk = rgbToCmyk(r, g, b);
+
+    const wax = Number(waxMass.value) || 0;
+
+    const c = cmyk.c * 100;
+    const m = cmyk.m * 100;
+    const y = cmyk.y * 100;
+    const k = cmyk.k * 100;
+
+    cyanPercent.textContent = c.toFixed(1) + "%";
+    magentaPercent.textContent = m.toFixed(1) + "%";
+    yellowPercent.textContent = y.toFixed(1) + "%";
+    blackPercent.textContent = k.toFixed(1) + "%";
+
+    cyanGrams.textContent =
+        (wax * cmyk.c).toFixed(3) + " g";
+
+    magentaGrams.textContent =
+        (wax * cmyk.m).toFixed(3) + " g";
+
+    yellowGrams.textContent =
+        (wax * cmyk.y).toFixed(3) + " g";
+
+    blackGrams.textContent =
+        (wax * cmyk.k).toFixed(3) + " g";
+}
+
+
+colorPicker.addEventListener(
+    "input",
+    updateCalculator
+);
+
+waxMass.addEventListener(
+    "input",
+    updateCalculator
+);
+
+
+updateCalculator();
+
+</script>
+
+</body>
+</html>
+```
