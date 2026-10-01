@@ -18,11 +18,16 @@ const hexValue =
 const waxMass =
     document.getElementById("waxMass");
 
+const maxDyeLoad =
+    document.getElementById("maxDyeLoad");
+
 
 const blackPercent =
     document.getElementById("blackPercent");
 const bluePercent =
     document.getElementById("bluePercent");
+const redPercent =
+    document.getElementById("redPercent");
 const magentaPercent =
     document.getElementById("magentaPercent");
 const yellowPercent =
@@ -38,6 +43,9 @@ const blackGrams =
 
 const blueGrams =
     document.getElementById("blueGrams");
+
+const redGrams =
+    document.getElementById("redGrams");
 
 const magentaGrams =
     document.getElementById("magentaGrams");
@@ -56,6 +64,7 @@ const greenGrams =
 let hue = 30;
 let saturationValue = 0.5;
 let brightness = 0.5;
+let pendingRecipeTimer = null;
 
 
 function hsvToRgb(h, s, v) {
@@ -226,7 +235,8 @@ function rgbToHsv(r, g, b) {
 
 function updateColorFromPosition(
     clientX,
-    clientY
+    clientY,
+    updateRecipe = true
 ) {
 
     const rect =
@@ -267,11 +277,11 @@ function updateColorFromPosition(
         `${y * 100}%`;
 
 
-    updateColor();
+    updateColor(updateRecipe);
 }
 
 
-function updateColor() {
+function updateColor(updateRecipe = true) {
 
     const rgb =
         hsvToRgb(
@@ -302,11 +312,35 @@ function updateColor() {
         hex.substring(1);
 
 
-    updateCalculator(
-        rgb.r,
-        rgb.g,
-        rgb.b
-    );
+    if (updateRecipe) {
+        updateCalculator(
+            rgb.r,
+            rgb.g,
+            rgb.b
+        );
+    }
+}
+
+
+function scheduleRecipeUpdate() {
+    if (pendingRecipeTimer !== null) {
+        return;
+    }
+
+    pendingRecipeTimer = setTimeout(() => {
+        pendingRecipeTimer = null;
+        updateColor();
+    }, 60);
+}
+
+
+function flushRecipeUpdate() {
+    if (pendingRecipeTimer !== null) {
+        clearTimeout(pendingRecipeTimer);
+        pendingRecipeTimer = null;
+    }
+
+    updateColor();
 }
 function rgbToLab(r, g, b) {
 
@@ -446,60 +480,78 @@ function linearToSrgb(value) {
 }
 
 
+const colors = [
+    { name: "black",   r: 62,  g: 61,  b: 72 },
+    { name: "blue",    r: 44,  g: 94,  b: 227 },
+    { name: "red",     r: 255, g: 23,  b: 64 },
+    { name: "magenta", r: 255, g: 125, b: 202 },
+    { name: "yellow",  r: 255, g: 214, b: 89 },
+    { name: "orange",  r: 255, g: 110, b: 1 },
+    { name: "green",   r: 77,  g: 183, b: 117 }
+];
+
+const linearColors = colors.map(color => ({
+    r: srgbToLinear(color.r),
+    g: srgbToLinear(color.g),
+    b: srgbToLinear(color.b)
+}));
+
+const mixtureColors = [{ r: 1, g: 1, b: 1 }, ...linearColors];
+const subsetSystems = [];
+
+
+function buildSubsetSystems(start, indices) {
+    if (indices.length > 0) {
+        const count = indices.length;
+        const matrix = Array.from(
+            { length: count + 1 },
+            () => new Array(count + 1).fill(0)
+        );
+
+        for (let row = 0; row < count; row++) {
+            const color = mixtureColors[indices[row]];
+
+            for (let column = 0; column < count; column++) {
+                const otherColor = mixtureColors[indices[column]];
+                matrix[row][column] =
+                    color.r * otherColor.r +
+                    color.g * otherColor.g +
+                    color.b * otherColor.b;
+            }
+
+            matrix[row][count] = 1;
+            matrix[count][row] = 1;
+        }
+
+        subsetSystems.push({ indices: [...indices], matrix });
+    }
+
+    if (indices.length === 4) {
+        return;
+    }
+
+    for (let index = start; index < mixtureColors.length; index++) {
+        indices.push(index);
+        buildSubsetSystems(index + 1, indices);
+        indices.pop();
+    }
+}
+
+
+buildSubsetSystems(0, []);
+
+
 function updateCalculator(r, g, b) {
 
     const wax = Number(waxMass.value) || 0;
 
-    // Calibration candles use 0.4% dye by wax mass.
-    const totalColorant = wax * 0.004;
+    const referenceDyePercent = 0.4;
+    const maxDyePercent = Math.max(
+        0,
+        Math.min(1, Number(maxDyeLoad.value) || 0)
+    );
 
-
-    /*
-    * Measured candle colors at 0.4% dye by wax mass.
-    * These RGB samples are used as an approximate mixing model.
-     */
-
-    const colors = [
-
-        { name: "black",   r: 62,  g: 61,  b: 72 },
-        { name: "blue",    r: 44,  g: 94,  b: 227 },
-        { name: "magenta", r: 255, g: 125, b: 202 },
-        { name: "yellow",  r: 255, g: 214, b: 89 },
-        { name: "orange",  r: 255, g: 110, b: 1 },
-        { name: "green",   r: 77,  g: 183, b: 117 },
-
-    ];
-
-
-    /*
-     * sRGB → linear RGB
-     */
-
-    function srgbToLinear(value) {
-
-        value /= 255;
-
-        return value <= 0.04045
-            ? value / 12.92
-            : Math.pow(
-                (value + 0.055) / 1.055,
-                2.4
-            );
-
-    }
-
-
-    /*
-    * Convert the measured color samples to linear RGB.
-     */
-
-    const linearColors = colors.map(color => ({
-
-        r: srgbToLinear(color.r),
-        g: srgbToLinear(color.g),
-        b: srgbToLinear(color.b)
-
-    }));
+    maxDyeLoad.value = String(maxDyePercent);
 
 
     /*
@@ -515,10 +567,6 @@ function updateCalculator(r, g, b) {
     };
 
     const targetLab = rgbToLab(r, g, b);
-
-
-    const white = { r: 1, g: 1, b: 1 };
-    const mixtureColors = [white, ...linearColors];
 
 
     function getMixedRGB(weights) {
@@ -699,12 +747,8 @@ function updateCalculator(r, g, b) {
     let bestPigmentCount = Infinity;
 
 
-    function evaluateSubset(indices) {
+    function evaluateSubset(indices, matrix) {
         const count = indices.length;
-        const matrix = Array.from(
-            { length: count + 1 },
-            () => new Array(count + 1).fill(0)
-        );
         const values = new Array(count + 1).fill(0);
 
         for (let row = 0; row < count; row++) {
@@ -713,17 +757,6 @@ function updateCalculator(r, g, b) {
                 color.r * target.r +
                 color.g * target.g +
                 color.b * target.b;
-
-            for (let column = 0; column < count; column++) {
-                const otherColor = mixtureColors[indices[column]];
-                matrix[row][column] =
-                    color.r * otherColor.r +
-                    color.g * otherColor.g +
-                    color.b * otherColor.b;
-            }
-
-            matrix[row][count] = 1;
-            matrix[count][row] = 1;
         }
 
         values[count] = 1;
@@ -757,24 +790,9 @@ function updateCalculator(r, g, b) {
     }
 
 
-    function searchSubsets(start, indices) {
-        if (indices.length > 0) {
-            evaluateSubset(indices);
-        }
-
-        if (indices.length === 4) {
-            return;
-        }
-
-        for (let index = start; index < mixtureColors.length; index++) {
-            indices.push(index);
-            searchSubsets(index + 1, indices);
-            indices.pop();
-        }
+    for (const { indices, matrix } of subsetSystems) {
+        evaluateSubset(indices, matrix);
     }
-
-
-    searchSubsets(0, []);
 
 
     /*
@@ -785,6 +803,7 @@ function updateCalculator(r, g, b) {
 
         blackPercent,
         bluePercent,
+        redPercent,
         magentaPercent,
         yellowPercent,
         orangePercent,
@@ -797,6 +816,7 @@ function updateCalculator(r, g, b) {
 
         blackGrams,
         blueGrams,
+        redGrams,
         magentaGrams,
         yellowGrams,
         orangeGrams,
@@ -811,20 +831,50 @@ function updateCalculator(r, g, b) {
 
     const dyeRatio = Math.max(0, 1 - ratios[0]);
     const hasDye = dyeRatio > 1e-8;
+    const dyeShares = colors.map((_, index) =>
+        hasDye ? ratios[index + 1] / dyeRatio : 0
+    );
+    const baseDyePercent = referenceDyePercent * dyeRatio;
+    const baseColor = getMixedRGB(ratios);
+    const baseLab = rgbToLab(
+        linearToSrgb(baseColor.r) * 255,
+        linearToSrgb(baseColor.g) * 255,
+        linearToSrgb(baseColor.b) * 255
+    );
+    const whiteLab = rgbToLab(255, 255, 255);
+    const baseVector = [
+        baseLab.L - whiteLab.L,
+        baseLab.a - whiteLab.a,
+        baseLab.b - whiteLab.b
+    ];
+    const targetVector = [
+        targetLab.L - whiteLab.L,
+        targetLab.a - whiteLab.a,
+        targetLab.b - whiteLab.b
+    ];
+    const vectorLengthSquared = baseVector.reduce(
+        (sum, value) => sum + value * value,
+        0
+    );
+    const requestedScale = vectorLengthSquared > 1e-12
+        ? baseVector.reduce((sum, value, index) => sum + value * targetVector[index], 0) /
+            vectorLengthSquared
+        : 0;
+    const maxScale = baseDyePercent > 0
+        ? maxDyePercent / baseDyePercent
+        : 0;
+    const doseScale = Math.max(0, Math.min(maxScale, requestedScale));
+    const totalDyePercent = baseDyePercent * doseScale;
 
 
     for (let i = 0; i < colors.length; i++) {
 
-        const dyeShare = hasDye
-            ? ratios[i + 1] / dyeRatio
-            : 0;
-
         percentageElements[i].textContent =
-            (dyeShare * 100).toFixed(1) + "%";
+            (dyeShares[i] * 100).toFixed(1) + "%";
 
 
         gramElements[i].textContent =
-            (totalColorant * ratios[i + 1]).toFixed(3) + " g";
+            (wax * totalDyePercent * dyeShares[i] / 100).toFixed(3) + " g";
 
     }
 
@@ -840,8 +890,26 @@ saturation.addEventListener(
 
         updateColorFromPosition(
             event.clientX,
-            event.clientY
+            event.clientY,
+            false
         );
+
+        scheduleRecipeUpdate();
+    }
+);
+
+
+saturation.addEventListener(
+    "pointerup",
+    event => {
+
+        updateColorFromPosition(
+            event.clientX,
+            event.clientY,
+            false
+        );
+
+        flushRecipeUpdate();
     }
 );
 
@@ -869,7 +937,17 @@ hueSlider.addEventListener(
         hue =
             Number(hueSlider.value);
 
-        updateColor();
+        updateColor(false);
+        scheduleRecipeUpdate();
+    }
+);
+
+
+hueSlider.addEventListener(
+    "change",
+    () => {
+
+        flushRecipeUpdate();
     }
 );
 
@@ -878,7 +956,16 @@ waxMass.addEventListener(
     "input",
     () => {
 
-        updateColor();
+        flushRecipeUpdate();
+    }
+);
+
+
+maxDyeLoad.addEventListener(
+    "input",
+    () => {
+
+        flushRecipeUpdate();
     }
 );
 
@@ -932,7 +1019,7 @@ hexValue.addEventListener(
             `${(1 - brightness) * 100}%`;
 
 
-        updateColor();
+        flushRecipeUpdate();
     }
 );
 
