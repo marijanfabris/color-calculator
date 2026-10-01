@@ -18,9 +18,6 @@ const hexValue =
 const waxMass =
     document.getElementById("waxMass");
 
-const maxDyeLoad =
-    document.getElementById("maxDyeLoad");
-
 
 const blackPercent =
     document.getElementById("blackPercent");
@@ -546,12 +543,7 @@ function updateCalculator(r, g, b) {
     const wax = Number(waxMass.value) || 0;
 
     const referenceDyePercent = 0.4;
-    const maxDyePercent = Math.max(
-        0,
-        Math.min(1, Number(maxDyeLoad.value) || 0)
-    );
-
-    maxDyeLoad.value = String(maxDyePercent);
+    const maxDyePercent = 0.6;
 
 
     /*
@@ -953,15 +945,6 @@ hueSlider.addEventListener(
 
 
 waxMass.addEventListener(
-    "input",
-    () => {
-
-        flushRecipeUpdate();
-    }
-);
-
-
-maxDyeLoad.addEventListener(
     "input",
     () => {
 
