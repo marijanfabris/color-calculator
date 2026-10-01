@@ -21,8 +21,8 @@ const waxMass =
 
 const blackPercent =
     document.getElementById("blackPercent");
-const cyanPercent =
-    document.getElementById("cyanPercent");
+const bluePercent =
+    document.getElementById("bluePercent");
 const magentaPercent =
     document.getElementById("magentaPercent");
 const yellowPercent =
@@ -36,8 +36,8 @@ const greenPercent =
 const blackGrams =
     document.getElementById("blackGrams");
 
-const cyanGrams =
-    document.getElementById("cyanGrams");
+const blueGrams =
+    document.getElementById("blueGrams");
 
 const magentaGrams =
     document.getElementById("magentaGrams");
@@ -450,24 +450,23 @@ function updateCalculator(r, g, b) {
 
     const wax = Number(waxMass.value) || 0;
 
-    // Total colorant = 0.5% of wax mass
-    const totalColorant = wax * 0.005;
+    // Calibration candles use 0.4% dye by wax mass.
+    const totalColorant = wax * 0.004;
 
 
     /*
-    * Idealized RGB placeholders for the seven colorants.
-     *
-    * Replace these values with measured colorant spectra for a physical model.
+    * Measured candle colors at 0.4% dye by wax mass.
+    * These RGB samples are used as an approximate mixing model.
      */
 
     const colors = [
 
-        { name: "black",   r: 0,   g: 0,   b: 0 },
-        { name: "cyan",    r: 0,   g: 255, b: 255 },
-        { name: "magenta", r: 255, g: 0,   b: 255 },
-        { name: "yellow",  r: 255, g: 255, b: 0 },
-        { name: "orange",  r: 255, g: 128, b: 0 },
-        { name: "green",   r: 0,   g: 255, b: 0 },
+        { name: "black",   r: 62,  g: 61,  b: 72 },
+        { name: "blue",    r: 44,  g: 94,  b: 227 },
+        { name: "magenta", r: 255, g: 125, b: 202 },
+        { name: "yellow",  r: 255, g: 214, b: 89 },
+        { name: "orange",  r: 255, g: 110, b: 1 },
+        { name: "green",   r: 77,  g: 183, b: 117 },
 
     ];
 
@@ -491,7 +490,7 @@ function updateCalculator(r, g, b) {
 
 
     /*
-     * Convert the eight colorants to linear RGB.
+    * Convert the measured color samples to linear RGB.
      */
 
     const linearColors = colors.map(color => ({
@@ -785,7 +784,7 @@ function updateCalculator(r, g, b) {
     const percentageElements = [
 
         blackPercent,
-        cyanPercent,
+        bluePercent,
         magentaPercent,
         yellowPercent,
         orangePercent,
@@ -797,7 +796,7 @@ function updateCalculator(r, g, b) {
     const gramElements = [
 
         blackGrams,
-        cyanGrams,
+        blueGrams,
         magentaGrams,
         yellowGrams,
         orangeGrams,
