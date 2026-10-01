@@ -515,6 +515,8 @@ function updateCalculator(r, g, b) {
 
     };
 
+    const targetLab = rgbToLab(r, g, b);
+
 
     const white = { r: 1, g: 1, b: 1 };
     const mixtureColors = [white, ...linearColors];
@@ -539,13 +541,112 @@ function updateCalculator(r, g, b) {
     }
 
 
-    function getError(weights) {
-        const mixed = getMixedRGB(weights);
-        const dr = mixed.r - target.r;
-        const dg = mixed.g - target.g;
-        const db = mixed.b - target.b;
+    function getErrorForMixedRGB(mixed) {
+        const mixedLab = rgbToLab(
+            linearToSrgb(mixed.r) * 255,
+            linearToSrgb(mixed.g) * 255,
+            linearToSrgb(mixed.b) * 255
+        );
 
-        return dr * dr + dg * dg + db * db;
+        const deltaE = labDistance(targetLab, mixedLab);
+        return deltaE * deltaE;
+    }
+
+
+    function getError(weights) {
+        return getErrorForMixedRGB(getMixedRGB(weights));
+    }
+
+
+    function projectToSimplex(values) {
+        const sorted = [...values].sort((a, b) => b - a);
+        let cumulative = 0;
+        let thresholdIndex = 0;
+
+        for (let index = 0; index < sorted.length; index++) {
+            cumulative += sorted[index];
+            const threshold = (cumulative - 1) / (index + 1);
+
+            if (sorted[index] > threshold) {
+                thresholdIndex = index + 1;
+            }
+        }
+
+        const threshold = (
+            sorted.slice(0, thresholdIndex).reduce((sum, value) => sum + value, 0) - 1
+        ) / thresholdIndex;
+
+        return values.map(value => Math.max(0, value - threshold));
+    }
+
+
+    function refineSubset(indices, initialRatios) {
+        let subsetRatios = projectToSimplex(initialRatios);
+
+        function expandRatios(values) {
+            const expanded = new Array(mixtureColors.length).fill(0);
+
+            for (let index = 0; index < indices.length; index++) {
+                expanded[indices[index]] = values[index];
+            }
+
+            return expanded;
+        }
+
+        let expandedRatios = expandRatios(subsetRatios);
+        let currentError = getError(expandedRatios);
+
+        for (let iteration = 0; iteration < 40; iteration++) {
+            const mixed = getMixedRGB(expandedRatios);
+            const epsilon = 1e-5;
+            const gradientRGB = {};
+
+            for (const channel of ["r", "g", "b"]) {
+                const higher = { ...mixed, [channel]: mixed[channel] + epsilon };
+                const lower = { ...mixed, [channel]: mixed[channel] - epsilon };
+
+                gradientRGB[channel] = (
+                    getErrorForMixedRGB(higher) - getErrorForMixedRGB(lower)
+                ) / (2 * epsilon);
+            }
+
+            const gradient = indices.map(index => {
+                const color = mixtureColors[index];
+                return gradientRGB.r * color.r +
+                    gradientRGB.g * color.g +
+                    gradientRGB.b * color.b;
+            });
+
+            let step = 1e-4;
+            let improved = false;
+
+            for (let attempt = 0; attempt < 20; attempt++) {
+                const nextRatios = projectToSimplex(
+                    subsetRatios.map((value, index) => value - step * gradient[index])
+                );
+                const nextExpanded = expandRatios(nextRatios);
+                const nextError = getError(nextExpanded);
+
+                if (nextError < currentError - 1e-12) {
+                    subsetRatios = nextRatios;
+                    expandedRatios = nextExpanded;
+                    currentError = nextError;
+                    improved = true;
+                    break;
+                }
+
+                step /= 2;
+            }
+
+            if (!improved) {
+                break;
+            }
+        }
+
+        return {
+            ratios: expandedRatios,
+            error: currentError
+        };
     }
 
 
@@ -630,37 +731,29 @@ function updateCalculator(r, g, b) {
 
         const subsetRatios = solveLinearSystem(matrix, values);
 
-        if (!subsetRatios || subsetRatios.some(value => value < -1e-9)) {
-            return;
+        const starts = [new Array(count).fill(1 / count)];
+
+        if (subsetRatios && subsetRatios.every(value => value >= -1e-9)) {
+            starts.push(subsetRatios.map(value => Math.max(0, value)));
         }
 
-        const candidate = new Array(mixtureColors.length).fill(0);
+        for (const start of starts) {
+            const candidate = refineSubset(indices, start);
+            const dyeRatio = 1 - candidate.ratios[0];
+            const pigmentCount = candidate.ratios.slice(1).filter(value => value > 1e-9).length;
+            const sameColor = Math.abs(candidate.error - bestError) <= 1e-10;
+            const usesLessDye = dyeRatio < bestDyeRatio - 1e-9;
+            const sameDye = Math.abs(dyeRatio - bestDyeRatio) <= 1e-9;
 
-        for (let index = 0; index < count; index++) {
-            candidate[indices[index]] = Math.max(0, subsetRatios[index]);
-        }
-
-        const total = candidate.reduce((sum, value) => sum + value, 0);
-
-        for (let index = 0; index < candidate.length; index++) {
-            candidate[index] /= total;
-        }
-
-        const error = getError(candidate);
-        const dyeRatio = 1 - candidate[0];
-        const pigmentCount = candidate.slice(1).filter(value => value > 1e-9).length;
-        const sameColor = Math.abs(error - bestError) <= 1e-12;
-        const usesLessDye = dyeRatio < bestDyeRatio - 1e-9;
-        const sameDye = Math.abs(dyeRatio - bestDyeRatio) <= 1e-9;
-
-        if (
-            error < bestError - 1e-12 ||
-            (sameColor && (usesLessDye || (sameDye && pigmentCount < bestPigmentCount)))
-        ) {
-            ratios = candidate;
-            bestError = error;
-            bestDyeRatio = dyeRatio;
-            bestPigmentCount = pigmentCount;
+            if (
+                candidate.error < bestError - 1e-10 ||
+                (sameColor && (usesLessDye || (sameDye && pigmentCount < bestPigmentCount)))
+            ) {
+                ratios = candidate.ratios;
+                bestError = candidate.error;
+                bestDyeRatio = dyeRatio;
+                bestPigmentCount = pigmentCount;
+            }
         }
     }
 
