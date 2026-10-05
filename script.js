@@ -543,7 +543,7 @@ function createMixtureModel(baseRgb) {
 
 
 const mixtureModels = {
-    wax: createMixtureModel({ r: 255, g: 250, b: 210 }),
+    wax: createMixtureModel({ r: 255, g: 255, b: 231 }),
     white: createMixtureModel({ r: 255, g: 255, b: 255 })
 };
 
