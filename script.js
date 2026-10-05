@@ -76,7 +76,6 @@ const greenGrams =
 let hue = 30;
 let saturationValue = 0.5;
 let brightness = 0.5;
-let pendingRecipeTimer = null;
 
 
 function hsvToRgb(h, s, v) {
@@ -334,24 +333,7 @@ function updateColor(updateRecipe = true) {
 }
 
 
-function scheduleRecipeUpdate() {
-    if (pendingRecipeTimer !== null) {
-        return;
-    }
-
-    pendingRecipeTimer = setTimeout(() => {
-        pendingRecipeTimer = null;
-        updateColor();
-    }, 60);
-}
-
-
 function flushRecipeUpdate() {
-    if (pendingRecipeTimer !== null) {
-        clearTimeout(pendingRecipeTimer);
-        pendingRecipeTimer = null;
-    }
-
     updateColor();
 }
 function rgbToLab(r, g, b) {
@@ -914,8 +896,6 @@ saturation.addEventListener(
             event.clientY,
             false
         );
-
-        scheduleRecipeUpdate();
     }
 );
 
@@ -945,7 +925,8 @@ saturation.addEventListener(
 
         updateColorFromPosition(
             event.clientX,
-            event.clientY
+            event.clientY,
+            false
         );
     }
 );
@@ -959,7 +940,6 @@ hueSlider.addEventListener(
             Number(hueSlider.value);
 
         updateColor(false);
-        scheduleRecipeUpdate();
     }
 );
 
