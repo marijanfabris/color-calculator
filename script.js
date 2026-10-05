@@ -868,12 +868,14 @@ function updateCalculator(r, g, b) {
         : 0;
     const doseScale = Math.max(0, Math.min(maxScale, requestedScale));
     const totalDyePercent = baseDyePercent * doseScale;
+    const totalDyeGrams = wax * totalDyePercent / 100;
+    const hasDisplayableDose = totalDyeGrams >= 0.0005;
 
 
     for (let i = 0; i < colors.length; i++) {
 
         percentageElements[i].textContent =
-            (dyeShares[i] * 100).toFixed(1) + "%";
+            ((hasDisplayableDose ? dyeShares[i] : 0) * 100).toFixed(1) + "%";
 
 
         gramElements[i].textContent =
