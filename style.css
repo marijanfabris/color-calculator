@@ -34,13 +34,26 @@
      margin-bottom: 8px;
  }
 
- input {
+ input,
+ select {
      width: 100%;
      min-height: 52px;
      font-size: 18px;
      padding: 10px;
      border: 1px solid #ccc;
      border-radius: 10px;
+ }
+
+ #baseColor.base-wax,
+ #baseColor option[value="wax"] {
+     background-color: #FFFAda;
+     color: #222;
+ }
+
+ #baseColor.base-white,
+ #baseColor option[value="white"] {
+     background-color: #FFFFFF;
+     color: #222;
  }
 
  .color-picker {

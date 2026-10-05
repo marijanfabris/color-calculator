@@ -18,6 +18,21 @@ const hexValue =
 const waxMass =
     document.getElementById("waxMass");
 
+const baseColorSelect =
+    document.getElementById("baseColor");
+
+
+function updateBaseColorSwatch() {
+    baseColorSelect.classList.toggle(
+        "base-wax",
+        baseColorSelect.value === "wax"
+    );
+    baseColorSelect.classList.toggle(
+        "base-white",
+        baseColorSelect.value === "white"
+    );
+}
+
 
 const blackPercent =
     document.getElementById("blackPercent");
@@ -493,54 +508,68 @@ const linearColors = colors.map(color => ({
     b: srgbToLinear(color.b)
 }));
 
-const mixtureColors = [{ r: 1, g: 1, b: 1 }, ...linearColors];
-const subsetSystems = [];
+function createMixtureModel(baseRgb) {
+    const baseColor = {
+        r: srgbToLinear(baseRgb.r),
+        g: srgbToLinear(baseRgb.g),
+        b: srgbToLinear(baseRgb.b)
+    };
+    const mixtureColors = [baseColor, ...linearColors];
+    const subsetSystems = [];
 
+    function buildSubsetSystems(start, indices) {
+        if (indices.length > 0) {
+            const count = indices.length;
+            const matrix = Array.from(
+                { length: count + 1 },
+                () => new Array(count + 1).fill(0)
+            );
 
-function buildSubsetSystems(start, indices) {
-    if (indices.length > 0) {
-        const count = indices.length;
-        const matrix = Array.from(
-            { length: count + 1 },
-            () => new Array(count + 1).fill(0)
-        );
+            for (let row = 0; row < count; row++) {
+                const color = mixtureColors[indices[row]];
 
-        for (let row = 0; row < count; row++) {
-            const color = mixtureColors[indices[row]];
+                for (let column = 0; column < count; column++) {
+                    const otherColor = mixtureColors[indices[column]];
+                    matrix[row][column] =
+                        color.r * otherColor.r +
+                        color.g * otherColor.g +
+                        color.b * otherColor.b;
+                }
 
-            for (let column = 0; column < count; column++) {
-                const otherColor = mixtureColors[indices[column]];
-                matrix[row][column] =
-                    color.r * otherColor.r +
-                    color.g * otherColor.g +
-                    color.b * otherColor.b;
+                matrix[row][count] = 1;
+                matrix[count][row] = 1;
             }
 
-            matrix[row][count] = 1;
-            matrix[count][row] = 1;
+            subsetSystems.push({ indices: [...indices], matrix });
         }
 
-        subsetSystems.push({ indices: [...indices], matrix });
+        if (indices.length === 4) {
+            return;
+        }
+
+        for (let index = start; index < mixtureColors.length; index++) {
+            indices.push(index);
+            buildSubsetSystems(index + 1, indices);
+            indices.pop();
+        }
     }
 
-    if (indices.length === 4) {
-        return;
-    }
+    buildSubsetSystems(0, []);
 
-    for (let index = start; index < mixtureColors.length; index++) {
-        indices.push(index);
-        buildSubsetSystems(index + 1, indices);
-        indices.pop();
-    }
+    return { mixtureColors, subsetSystems };
 }
 
 
-buildSubsetSystems(0, []);
+const mixtureModels = {
+    wax: createMixtureModel({ r: 255, g: 250, b: 218 }),
+    white: createMixtureModel({ r: 255, g: 255, b: 255 })
+};
 
 
 function updateCalculator(r, g, b) {
 
     const wax = Number(waxMass.value) || 0;
+    const { mixtureColors, subsetSystems } = mixtureModels[baseColorSelect.value];
 
     const referenceDyePercent = 0.4;
     const maxDyePercent = 0.6;
@@ -953,6 +982,16 @@ waxMass.addEventListener(
 );
 
 
+baseColorSelect.addEventListener(
+    "change",
+    () => {
+
+        updateBaseColorSwatch();
+        flushRecipeUpdate();
+    }
+);
+
+
 hexValue.addEventListener(
     "input",
     () => {
@@ -1014,5 +1053,6 @@ pickerCursor.style.top =
     "50%";
 
 
+updateBaseColorSwatch();
 updateColor();
 
