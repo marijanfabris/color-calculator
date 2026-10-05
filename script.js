@@ -48,6 +48,8 @@ const orangePercent =
     document.getElementById("orangePercent");
 const greenPercent =
     document.getElementById("greenPercent");
+const whitePercent =
+    document.getElementById("whitePercent");
 
 
 const blackGrams =
@@ -70,6 +72,9 @@ const orangeGrams =
 
 const greenGrams =
     document.getElementById("greenGrams");
+
+const whiteGrams =
+    document.getElementById("whiteGrams");
 
 
 
@@ -474,6 +479,9 @@ function linearToSrgb(value) {
 }
 
 
+const REFERENCE_DYE_PERCENT = 0.4;
+const MAX_MIXTURE_COMPONENTS = 4;
+
 const colors = [
     { name: "black",   r: 62,  g: 61,  b: 72 },
     { name: "blue",    r: 44,  g: 94,  b: 227 },
@@ -481,7 +489,8 @@ const colors = [
     { name: "magenta", r: 255, g: 125, b: 202 },
     { name: "yellow",  r: 255, g: 214, b: 89 },
     { name: "orange",  r: 255, g: 110, b: 1 },
-    { name: "green",   r: 77,  g: 183, b: 117 }
+    { name: "green",   r: 77,  g: 183, b: 117 },
+    { name: "white",   r: 255, g: 255, b: 255 }
 ];
 
 const linearColors = colors.map(color => ({
@@ -525,7 +534,7 @@ function createMixtureModel(baseRgb) {
             subsetSystems.push({ indices: [...indices], matrix });
         }
 
-        if (indices.length === 4) {
+        if (indices.length === MAX_MIXTURE_COMPONENTS) {
             return;
         }
 
@@ -550,12 +559,11 @@ const mixtureModels = {
 
 function updateCalculator(r, g, b) {
 
-    const wax = Number(waxMass.value) || 0;
+    const waxValue = Number(waxMass.value);
+    const wax = Number.isFinite(waxValue)
+        ? Math.max(0, waxValue)
+        : 0;
     const { mixtureColors, subsetSystems } = mixtureModels[baseColorSelect.value];
-
-    const referenceDyePercent = 0.4;
-    const maxDyePercent = 0.6;
-
 
     /*
      * Convert target to linear RGB.
@@ -810,7 +818,8 @@ function updateCalculator(r, g, b) {
         magentaPercent,
         yellowPercent,
         orangePercent,
-        greenPercent
+        greenPercent,
+        whitePercent
 
     ];
 
@@ -823,7 +832,8 @@ function updateCalculator(r, g, b) {
         magentaGrams,
         yellowGrams,
         orangeGrams,
-        greenGrams
+        greenGrams,
+        whiteGrams
 
     ];
 
@@ -837,49 +847,44 @@ function updateCalculator(r, g, b) {
     const dyeShares = colors.map((_, index) =>
         hasDye ? ratios[index + 1] / dyeRatio : 0
     );
-    const baseDyePercent = referenceDyePercent * dyeRatio;
-    const baseColor = getMixedRGB(ratios);
-    const baseLab = rgbToLab(
-        linearToSrgb(baseColor.r) * 255,
-        linearToSrgb(baseColor.g) * 255,
-        linearToSrgb(baseColor.b) * 255
-    );
-    const whiteLab = rgbToLab(255, 255, 255);
-    const baseVector = [
-        baseLab.L - whiteLab.L,
-        baseLab.a - whiteLab.a,
-        baseLab.b - whiteLab.b
+    const baseColor = mixtureColors[0];
+    const dyeBlend = linearColors.reduce((blend, color, index) => ({
+        r: blend.r + color.r * dyeShares[index],
+        g: blend.g + color.g * dyeShares[index],
+        b: blend.b + color.b * dyeShares[index]
+    }), { r: 0, g: 0, b: 0 });
+    const blendDirection = [
+        dyeBlend.r - baseColor.r,
+        dyeBlend.g - baseColor.g,
+        dyeBlend.b - baseColor.b
     ];
-    const targetVector = [
-        targetLab.L - whiteLab.L,
-        targetLab.a - whiteLab.a,
-        targetLab.b - whiteLab.b
+    const targetDirection = [
+        target.r - baseColor.r,
+        target.g - baseColor.g,
+        target.b - baseColor.b
     ];
-    const vectorLengthSquared = baseVector.reduce(
+    const blendLengthSquared = blendDirection.reduce(
         (sum, value) => sum + value * value,
         0
     );
-    const requestedScale = vectorLengthSquared > 1e-12
-        ? baseVector.reduce((sum, value, index) => sum + value * targetVector[index], 0) /
-            vectorLengthSquared
+    const requestedScale = blendLengthSquared > 1e-12
+        ? blendDirection.reduce(
+            (sum, value, index) => sum + value * targetDirection[index],
+            0
+        ) / blendLengthSquared
         : 0;
-    const maxScale = baseDyePercent > 0
-        ? maxDyePercent / baseDyePercent
-        : 0;
-    const doseScale = Math.max(0, Math.min(maxScale, requestedScale));
-    const totalDyePercent = baseDyePercent * doseScale;
+    const requestedDyePercent = REFERENCE_DYE_PERCENT * Math.max(0, requestedScale);
+    const totalDyePercent = requestedDyePercent;
     const totalDyeGrams = wax * totalDyePercent / 100;
-    const hasDisplayableDose = totalDyeGrams >= 0.0005;
-
 
     for (let i = 0; i < colors.length; i++) {
 
         percentageElements[i].textContent =
-            ((hasDisplayableDose ? dyeShares[i] : 0) * 100).toFixed(1) + "%";
+            (dyeShares[i] * 100).toFixed(1) + "%";
 
 
         gramElements[i].textContent =
-            (wax * totalDyePercent * dyeShares[i] / 100).toFixed(3) + " g";
+            (wax * totalDyePercent * dyeShares[i] / 100).toFixed(2) + " g";
 
     }
 
